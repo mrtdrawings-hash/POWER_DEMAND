@@ -2,6 +2,7 @@ import streamlit as st
 import pandas as pd
 import numpy as np
 import time
+import os
 from datetime import datetime, timedelta
 from PIL import Image, ImageDraw, ImageFont
 
@@ -51,9 +52,10 @@ st.markdown("""
 
 st.title("National & State Grid Monitoring Dashboard")
 
-# Relative paths for GitHub deployment
-image_path = "GAUGE.jpg"
-font_path = "font.ttf"  # Bundled font file
+# DYNAMIC PATH RESOLUTION: Finds your files anywhere (Local or Cloud Server)
+current_dir = os.path.dirname(os.path.abspath(__file__))
+image_path = os.path.join(current_dir, "GAUGE.jpg")
+font_path = os.path.join(current_dir, "font.ttf")
 
 # 3. Simulated Telemetry Engine for State & National Trends
 def generate_24hr_grid_data():
@@ -112,12 +114,30 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     img = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     
-    # 100% Reliable: Tries to pull the font file bundled in your repository first
-    try:
-        font = ImageFont.truetype(font_path, font_size)
-    except IOError:
+    # Robust multi-tier font resolution logic
+    font_loaded = False
+    
+    # Tier 1: Try your absolute repository file path
+    if os.path.exists(font_path):
+        try:
+            font = ImageFont.truetype(font_path, font_size)
+            font_loaded = True
+        except Exception:
+            pass
+
+    # Tier 2: Try pulling directly by filename string if pathing failed
+    if not font_loaded:
+        try:
+            font = ImageFont.truetype("font.ttf", font_size)
+            font_loaded = True
+        except IOError:
+            pass
+
+    # Tier 3: Linux standard fallback if repository bundle was missing
+    if not font_loaded:
         try:
             font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
+            font_loaded = True
         except IOError:
             font = ImageFont.load_default()
         
