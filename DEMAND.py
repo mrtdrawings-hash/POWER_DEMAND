@@ -51,6 +51,7 @@ st.markdown("""
 
 st.title("National & State Grid Monitoring Dashboard")
 
+# FIXED: Relative path for GitHub deployment
 image_path = "GAUGE.jpg"
 
 # 3. Simulated Telemetry Engine for State & National Trends
@@ -106,14 +107,18 @@ st.markdown(
 )
 
 # Function to draw two lines of text perfectly stacked and centered in the optical area
-def draw_two_lines_on_gauge(img_path, lines, font_size=45, line_spacing=10):
+def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     img = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     
+    # Try Linux cloud server standard font first, fallback to Windows Arial, then system default
     try:
-        font = ImageFont.truetype("arial.ttf", font_size) 
+        font = ImageFont.truetype("DejaVuSans.ttf", font_size)
     except IOError:
-        font = ImageFont.load_default()
+        try:
+            font = ImageFont.truetype("arial.ttf", font_size)
+        except IOError:
+            font = ImageFont.load_default()
         
     img_w, img_h = img.size
     
@@ -125,8 +130,8 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=45, line_spacing=10):
     h2 = bbox_line2[3] - bbox_line2[1]
     total_text_height = h1 + line_spacing + h2
     
-    # Base starting Y coordinate to center the whole block vertically
-    start_y = (img_h - total_text_height) // 2 + 15
+    # Base starting Y coordinate to center the whole block vertically inside the blue region
+    start_y = (img_h - total_text_height) // 2 + 10
     
     # Line 1: Calculate specific centered X for the number string
     w1 = bbox_line1[2] - bbox_line1[0]
@@ -149,7 +154,8 @@ with col_state:
     st.metric(label="Live TN Demand", value=live_state_metric_str, delta="-142 MW vs Last Hour")
     
     try:
-        img_state = draw_two_lines_on_gauge(image_path, state_lines, font_size=50)
+        # Boosted base font size to 55 for bold, striking visuals
+        img_state = draw_two_lines_on_gauge(image_path, state_lines, font_size=55)
         st.image(img_state, width=gauge_size)
     except FileNotFoundError:
         st.error("State gauge image missing.")
@@ -160,7 +166,7 @@ with col_national:
     st.metric(label="Live National Demand", value=live_national_metric_str, delta="+1,850 MW vs Last Hour")
     
     try:
-        img_nat = draw_two_lines_on_gauge(image_path, national_lines, font_size=50)
+        img_nat = draw_two_lines_on_gauge(image_path, national_lines, font_size=55)
         st.image(img_nat, width=gauge_size)
     except FileNotFoundError:
         st.error("National gauge image missing.")
