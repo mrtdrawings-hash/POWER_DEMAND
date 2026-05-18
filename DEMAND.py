@@ -52,7 +52,7 @@ st.markdown("""
 
 st.title("National & State Grid Monitoring Dashboard")
 
-# DYNAMIC PATH RESOLUTION: Finds your files anywhere (Local or Cloud Server)
+# Core layout paths
 current_dir = os.path.dirname(os.path.abspath(__file__))
 image_path = os.path.join(current_dir, "GAUGE.jpg")
 font_path = os.path.join(current_dir, "font.ttf")
@@ -114,10 +114,9 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     img = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     
-    # Robust multi-tier font resolution logic
     font_loaded = False
     
-    # Tier 1: Try your absolute repository file path
+    # 1. First choice: Local repository file match
     if os.path.exists(font_path):
         try:
             font = ImageFont.truetype(font_path, font_size)
@@ -125,7 +124,7 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
         except Exception:
             pass
 
-    # Tier 2: Try pulling directly by filename string if pathing failed
+    # 2. Second choice: Direct repository file name fall-through
     if not font_loaded:
         try:
             font = ImageFont.truetype("font.ttf", font_size)
@@ -133,13 +132,14 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
         except IOError:
             pass
 
-    # Tier 3: Linux standard fallback if repository bundle was missing
+    # 3. Streamlit Cloud Master Choice: Programmatically force sizing on the native internal engine
     if not font_loaded:
+        base_font = ImageFont.load_default()
         try:
-            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
-            font_loaded = True
-        except IOError:
-            font = ImageFont.load_default()
+            # Dynamically scales the integrated server font asset without file-checking errors
+            font = base_font.font_variant(size=font_size)
+        except AttributeError:
+            font = base_font
         
     img_w, img_h = img.size
     
@@ -151,15 +151,15 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     h2 = bbox_line2[3] - bbox_line2[1]
     total_text_height = h1 + line_spacing + h2
     
-    # Base starting Y coordinate to center the whole block vertically inside the blue region
+    # Center the entire text stack symmetrically within the central display area
     start_y = (img_h - total_text_height) // 2 + 10
     
-    # Line 1: Calculate specific centered X for the number string
+    # Line 1: Draw the numeric value
     w1 = bbox_line1[2] - bbox_line1[0]
     x1 = (img_w - w1) // 2
     draw.text((x1, start_y), lines[0], fill=(255, 255, 255), font=font)
     
-    # Line 2: Calculate specific centered X for the "MW" string independently
+    # Line 2: Draw the "MW" unit directly centered below it
     w2 = bbox_line2[2] - bbox_line2[0]
     x2 = (img_w - w2) // 2
     draw.text((x2, start_y + h1 + line_spacing), lines[1], fill=(255, 255, 255), font=font)
