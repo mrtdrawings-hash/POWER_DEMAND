@@ -51,7 +51,7 @@ st.markdown("""
 
 st.title("National & State Grid Monitoring Dashboard")
 
-# FIXED: Relative path for GitHub deployment
+# Relative path for GitHub deployment
 image_path = "GAUGE.jpg"
 
 # 3. Simulated Telemetry Engine for State & National Trends
@@ -111,14 +111,17 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     img = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     
-    # Try Linux cloud server standard font first, fallback to Windows Arial, then system default
+    # Updated to check absolute Linux cloud environment path first
     try:
-        font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
     except IOError:
         try:
-            font = ImageFont.truetype("arial.ttf", font_size)
+            font = ImageFont.truetype("DejaVuSans.ttf", font_size)
         except IOError:
-            font = ImageFont.load_default()
+            try:
+                font = ImageFont.truetype("arial.ttf", font_size)
+            except IOError:
+                font = ImageFont.load_default()
         
     img_w, img_h = img.size
     
@@ -154,7 +157,6 @@ with col_state:
     st.metric(label="Live TN Demand", value=live_state_metric_str, delta="-142 MW vs Last Hour")
     
     try:
-        # Boosted base font size to 55 for bold, striking visuals
         img_state = draw_two_lines_on_gauge(image_path, state_lines, font_size=55)
         st.image(img_state, width=gauge_size)
     except FileNotFoundError:
