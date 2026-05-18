@@ -51,8 +51,9 @@ st.markdown("""
 
 st.title("National & State Grid Monitoring Dashboard")
 
-# Relative path for GitHub deployment
+# Relative paths for GitHub deployment
 image_path = "GAUGE.jpg"
+font_path = "font.ttf"  # Bundled font file
 
 # 3. Simulated Telemetry Engine for State & National Trends
 def generate_24hr_grid_data():
@@ -111,17 +112,14 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     img = Image.open(img_path).convert("RGB")
     draw = ImageDraw.Draw(img)
     
-    # Updated to check absolute Linux cloud environment path first
+    # 100% Reliable: Tries to pull the font file bundled in your repository first
     try:
-        font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
+        font = ImageFont.truetype(font_path, font_size)
     except IOError:
         try:
-            font = ImageFont.truetype("DejaVuSans.ttf", font_size)
+            font = ImageFont.truetype("/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf", font_size)
         except IOError:
-            try:
-                font = ImageFont.truetype("arial.ttf", font_size)
-            except IOError:
-                font = ImageFont.load_default()
+            font = ImageFont.load_default()
         
     img_w, img_h = img.size
     
