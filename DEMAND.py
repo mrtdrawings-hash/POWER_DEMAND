@@ -3,7 +3,7 @@ import pandas as pd
 import numpy as np
 import time
 import os
-from datetime import datetime, timedelta
+from datetime import datetime, timedelta, timezone  # Added timezone here
 from PIL import Image, ImageDraw, ImageFont
 
 # 1. Page Configuration
@@ -57,9 +57,13 @@ current_dir = os.path.dirname(os.path.abspath(__file__))
 image_path = os.path.join(current_dir, "GAUGE.jpg")
 font_path = os.path.join(current_dir, "font.ttf")
 
+# Define India Standard Time (IST) Zone object globally
+IST = timezone(timedelta(hours=5, minutes=30))
+
 # 3. Simulated Telemetry Engine for State & National Trends
 def generate_24hr_grid_data():
-    current_time = datetime.now()
+    # Force current time to be in IST
+    current_time = datetime.now(IST)
     time_slots = []
     state_vals = []
     national_vals = []
@@ -103,9 +107,10 @@ live_national_metric_str = f"{live_national_val:,} MW"
 # Size Control Widget
 gauge_size = st.slider("Adjust Gauge Size for View:", min_value=150, max_value=400, value=220, step=10)
 
+# Force the last refresh indicator to also display in IST
 st.markdown(
     f"<div style='text-align: center; font-size: 0.85rem; opacity: 0.8; margin-bottom: 15px; font-weight: bold;'>"
-    f"Last Live Auto-Refresh: {datetime.now().strftime('%H:%M:%S')} (Interval: 1 Min)</div>", 
+    f"Last Live Auto-Refresh: {datetime.now(IST).strftime('%H:%M:%S')} (Interval: 1 Min)</div>", 
     unsafe_allow_html=True
 )
 
@@ -136,14 +141,12 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     if not font_loaded:
         base_font = ImageFont.load_default()
         try:
-            # Dynamically scales the integrated server font asset without file-checking errors
             font = base_font.font_variant(size=font_size)
         except AttributeError:
             font = base_font
         
     img_w, img_h = img.size
     
-    # Calculate bounding boxes to determine heights and widths
     bbox_line1 = draw.textbbox((0, 0), lines[0], font=font)
     bbox_line2 = draw.textbbox((0, 0), lines[1], font=font)
     
@@ -151,15 +154,12 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     h2 = bbox_line2[3] - bbox_line2[1]
     total_text_height = h1 + line_spacing + h2
     
-    # Center the entire text stack symmetrically within the central display area
     start_y = (img_h - total_text_height) // 2 + 10
     
-    # Line 1: Draw the numeric value
     w1 = bbox_line1[2] - bbox_line1[0]
     x1 = (img_w - w1) // 2
     draw.text((x1, start_y), lines[0], fill=(255, 255, 255), font=font)
     
-    # Line 2: Draw the "MW" unit directly centered below it
     w2 = bbox_line2[2] - bbox_line2[0]
     x2 = (img_w - w2) // 2
     draw.text((x2, start_y + h1 + line_spacing), lines[1], fill=(255, 255, 255), font=font)
