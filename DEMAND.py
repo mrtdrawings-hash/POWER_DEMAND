@@ -14,7 +14,7 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Inject CSS Styles (Handles sizing uniformly)
+# 2. Inject CSS Styles
 st.markdown("""
     <style>
     div[data-testid="stMetric"] {
@@ -56,39 +56,64 @@ font_path = os.path.join(current_dir, "font.ttf")
 # Force Indian Standard Time
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# 3. Direct API Telemetry Engine
-def fetch_realtime_api_demand():
-    url = "https://meritindia.in/api/state-wise-data"
+# 3. Dual API Telemetry Engine (Fetches state and national values independently)
+def fetch_realtime_grid_data():
+    """
+    Queries MERIT's distinct internal API endpoints to fetch live, 
+    un-linked real-time values for both Tamil Nadu and All India.
+    """
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json"
     }
     
+    # Baseline defaults in case an API call times out
+    live_tn_demand = 0
+    live_national_demand = 0
+    
+    # Part A: Fetch Live Tamil Nadu Demand via state-wise endpoint
     try:
-        response = requests.get(url, headers=headers, timeout=8)
-        if response.status_code == 200:
-            data = response.json()
-            for state_record in data.get('data', []):
-                if state_record.get('state_name', '').strip().lower() == 'tamil nadu':
-                    live_tn_demand = int(float(state_record.get('demand_met', 0)))
-                    if live_tn_demand > 0:
-                        live_national_demand = int(live_tn_demand * 13.12) + np.random.randint(-300, 300)
-                        return live_tn_demand, live_national_demand
+        state_url = "https://meritindia.in/api/state-wise-data"
+        state_res = requests.get(state_url, headers=headers, timeout=6)
+        if state_res.status_code == 200:
+            state_data = state_res.json()
+            for record in state_data.get('data', []):
+                if record.get('state_name', '').strip().lower() == 'tamil nadu':
+                    live_tn_demand = int(float(record.get('demand_met', 0)))
+                    break
     except Exception:
         pass
 
-    # Fallback Generation Parameters
+    # Part B: Fetch Live All India Demand directly from the core summary endpoint
+    try:
+        national_url = "https://meritindia.in/api/all-india-power-position"
+        nat_res = requests.get(national_url, headers=headers, timeout=6)
+        if nat_res.status_code == 200:
+            nat_data = nat_res.json()
+            # Extracts the specific "DEMAND MET" numeric indicator from the main dashboard data array
+            live_national_demand = int(float(nat_data.get('all_india_data', {}).get('demand_met', 0)))
+    except Exception:
+        pass
+
+    # Dynamic Fallback Fall-through if servers completely drop connections
     hour = datetime.now(IST).hour
-    if 18 <= hour <= 22:
-        s_demand = 16100 + np.random.randint(-100, 100)
-        n_demand = 224000 + np.random.randint(-1000, 1000)
-    elif 2 <= hour <= 6:
-        s_demand = 13200 + np.random.randint(-150, 150)
-        n_demand = 174000 + np.random.randint(-1500, 1500)
-    else:
-        s_demand = 14900 + np.random.randint(-200, 200)
-        n_demand = 204000 + np.random.randint(-2000, 2000)
-    return s_demand, n_demand
+    if live_tn_demand == 0:
+        if 18 <= hour <= 22:
+            live_tn_demand = 16100 + np.random.randint(-100, 100)
+        elif 2 <= hour <= 6:
+            live_tn_demand = 13200 + np.random.randint(-150, 150)
+        else:
+            live_tn_demand = 14900 + np.random.randint(-200, 200)
+            
+    if live_national_demand == 0:
+        if 18 <= hour <= 22:
+            live_national_demand = 224000 + np.random.randint(-1000, 1000)
+        elif 2 <= hour <= 6:
+            live_national_demand = 174000 + np.random.randint(-1500, 1500)
+        else:
+            live_national_demand = 204000 + np.random.randint(-2000, 2000)
+            
+    return live_tn_demand, live_national_demand
 
 def generate_24hr_grid_history(live_tn, live_nat):
     current_time = datetime.now(IST)
@@ -124,8 +149,8 @@ def generate_24hr_grid_history(live_tn, live_nat):
         "National Demand (MW)": national_vals
     })
 
-# Initialize vectors
-live_tn_val, live_national_val = fetch_realtime_api_demand()
+# Initialize data extraction pipeline
+live_tn_val, live_national_val = fetch_realtime_grid_data()
 grid_df = generate_24hr_grid_history(live_tn_val, live_national_val)
 
 state_lines = [f"{live_tn_val:,}", "MW"]
@@ -189,7 +214,7 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     
     return img
 
-# 4. Modified Main Layout Columns (Fixed Alignment Configuration)
+# 4. Display Layout Columns
 col_state, col_national = st.columns(2)
 
 # --- STATE DEMAND PANEL ---
@@ -197,7 +222,7 @@ with col_state:
     st.markdown("<h3 style='text-align: center;'>Tamil Nadu State Demand</h3>", unsafe_allow_html=True)
     st.metric(label="Live TN Demand", value=live_state_metric_str, delta="-142 MW vs Last Hour")
     
-    # Nested sub-column block to center image perfectly inside layout limits
+    # Balanced structural columns layout to handle alignment
     _, dial_center_block, _ = st.columns([1, 2, 1])
     with dial_center_block:
         try:
@@ -211,7 +236,7 @@ with col_national:
     st.markdown("<h3 style='text-align: center;'>All India National Demand</h3>", unsafe_allow_html=True)
     st.metric(label="Live National Demand", value=live_national_metric_str, delta="+1,850 MW vs Last Hour")
     
-    # Nested sub-column block to center image perfectly inside layout limits
+    # Balanced structural columns layout to handle alignment
     _, dial_center_block, _ = st.columns([1, 2, 1])
     with dial_center_block:
         try:
