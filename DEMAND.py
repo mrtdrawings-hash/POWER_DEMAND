@@ -14,10 +14,9 @@ st.set_page_config(
     initial_sidebar_state="collapsed"
 )
 
-# 2. Inject CSS Styles (Fixed the desktop viewport metric distortion completely)
+# 2. Inject CSS Styles (Handles sizing uniformly)
 st.markdown("""
     <style>
-    /* Desktop layout overrides to keep metric text properly proportioned */
     div[data-testid="stMetric"] {
         text-align: center !important;
         display: flex !important;
@@ -57,12 +56,8 @@ font_path = os.path.join(current_dir, "font.ttf")
 # Force Indian Standard Time
 IST = timezone(timedelta(hours=5, minutes=30))
 
-# 3. Direct API Telemetry Engine (Bypasses stale webpage summaries)
+# 3. Direct API Telemetry Engine
 def fetch_realtime_api_demand():
-    """
-    Queries MERIT's internal direct data stream endpoint to bypass stale front-end summaries.
-    """
-    # Direct backend API for real-time map data stream
     url = "https://meritindia.in/api/state-wise-data"
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
@@ -73,19 +68,16 @@ def fetch_realtime_api_demand():
         response = requests.get(url, headers=headers, timeout=8)
         if response.status_code == 200:
             data = response.json()
-            # Loop through states to isolate Tamil Nadu's real-time map node
             for state_record in data.get('data', []):
                 if state_record.get('state_name', '').strip().lower() == 'tamil nadu':
-                    # Extract the exact active value shown on the live map vector
                     live_tn_demand = int(float(state_record.get('demand_met', 0)))
                     if live_tn_demand > 0:
-                        # Synchronize National demand with real-world ratio offsets
                         live_national_demand = int(live_tn_demand * 13.12) + np.random.randint(-300, 300)
                         return live_tn_demand, live_national_demand
     except Exception:
         pass
 
-    # Safe Operational Fallback engine if endpoint drops
+    # Fallback Generation Parameters
     hour = datetime.now(IST).hour
     if 18 <= hour <= 22:
         s_demand = 16100 + np.random.randint(-100, 100)
@@ -132,7 +124,7 @@ def generate_24hr_grid_history(live_tn, live_nat):
         "National Demand (MW)": national_vals
     })
 
-# Fetch the absolute live map data stream point
+# Initialize vectors
 live_tn_val, live_national_val = fetch_realtime_api_demand()
 grid_df = generate_24hr_grid_history(live_tn_val, live_national_val)
 
@@ -142,7 +134,7 @@ live_state_metric_str = f"{live_tn_val:,} MW"
 national_lines = [f"{live_national_val:,}", "MW"]
 live_national_metric_str = f"{live_national_val:,} MW"
 
-# Layout Size Control
+# Layout Size Control Widget
 gauge_size = st.slider("Adjust Gauge Size for View:", min_value=150, max_value=400, value=220, step=10)
 
 st.markdown(
@@ -197,26 +189,36 @@ def draw_two_lines_on_gauge(img_path, lines, font_size=55, line_spacing=12):
     
     return img
 
-# 4. Display Layout Elements
+# 4. Modified Main Layout Columns (Fixed Alignment Configuration)
 col_state, col_national = st.columns(2)
 
+# --- STATE DEMAND PANEL ---
 with col_state:
     st.markdown("<h3 style='text-align: center;'>Tamil Nadu State Demand</h3>", unsafe_allow_html=True)
     st.metric(label="Live TN Demand", value=live_state_metric_str, delta="-142 MW vs Last Hour")
-    try:
-        img_state = draw_two_lines_on_gauge(image_path, state_lines, font_size=55)
-        st.image(img_state, width=gauge_size)
-    except FileNotFoundError:
-        st.error("State gauge image missing.")
+    
+    # Nested sub-column block to center image perfectly inside layout limits
+    _, dial_center_block, _ = st.columns([1, 2, 1])
+    with dial_center_block:
+        try:
+            img_state = draw_two_lines_on_gauge(image_path, state_lines, font_size=55)
+            st.image(img_state, width=gauge_size, use_container_width=False)
+        except FileNotFoundError:
+            st.error("State gauge image missing.")
 
+# --- NATIONAL DEMAND PANEL ---
 with col_national:
     st.markdown("<h3 style='text-align: center;'>All India National Demand</h3>", unsafe_allow_html=True)
     st.metric(label="Live National Demand", value=live_national_metric_str, delta="+1,850 MW vs Last Hour")
-    try:
-        img_nat = draw_two_lines_on_gauge(image_path, national_lines, font_size=55)
-        st.image(img_nat, width=gauge_size)
-    except FileNotFoundError:
-        st.error("National gauge image missing.")
+    
+    # Nested sub-column block to center image perfectly inside layout limits
+    _, dial_center_block, _ = st.columns([1, 2, 1])
+    with dial_center_block:
+        try:
+            img_nat = draw_two_lines_on_gauge(image_path, national_lines, font_size=55)
+            st.image(img_nat, width=gauge_size, use_container_width=False)
+        except FileNotFoundError:
+            st.error("National gauge image missing.")
 
 st.markdown("---")
 
@@ -232,6 +234,6 @@ elif chart_view == "State Only":
 else:
     st.line_chart(trend_df_indexed, y="National Demand (MW)", color="#ffaa00")
 
-# 6. Auto-Refresh
+# 6. Auto-Refresh Loop
 time.sleep(60)
 st.rerun()
